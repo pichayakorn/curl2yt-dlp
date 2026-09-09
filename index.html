@@ -168,32 +168,246 @@
             }
 
             /**
+             * Escapes single quotes for POSIX shell command compatibility.
+             * @param {string} str The string to escape.
+             * @returns {string} The escaped string.
+             */
+            function escapeSingleQuote(str) {
+                return str.replace(/'/g, "'\\''");
+            }
+
+            /**
+             * Tokenizes a shell command string into discrete arguments, handling
+             * single quotes, double quotes, escape sequences, and line continuations.
+             * @param {string} input The raw command string.
+             * @returns {string[]} Array of argument tokens.
+             */
+            function tokenizeCurl(input) {
+                // Pre-clean: strip line continuations (\ or ^ followed by newline)
+                // and normalize Windows CMD caret-escaped quotes (^")
+                const clean = input
+                    .trim()
+                    .replace(/\\\s*\r?\n/g, " ")
+                    .replace(/\^\s*\r?\n/g, " ")
+                    .replace(/\^"/g, '"');
+
+                const args = [];
+                let current = "";
+                let inSingle = false;
+                let inDouble = false;
+                let escaped = false;
+                let tokenStarted = false;
+
+                for (let i = 0; i < clean.length; i++) {
+                    const c = clean[i];
+
+                    if (escaped) {
+                        current += c;
+                        escaped = false;
+                        tokenStarted = true;
+                        continue;
+                    }
+
+                    if (c === "\\" && !inSingle) {
+                        escaped = true;
+                        tokenStarted = true;
+                        continue;
+                    }
+
+                    if (c === "'" && !inDouble) {
+                        inSingle = !inSingle;
+                        tokenStarted = true;
+                        continue;
+                    }
+
+                    if (c === '"' && !inSingle) {
+                        inDouble = !inDouble;
+                        tokenStarted = true;
+                        continue;
+                    }
+
+                    if (!inSingle && !inDouble && /\s/.test(c)) {
+                        if (tokenStarted) {
+                            args.push(current);
+                            current = "";
+                            tokenStarted = false;
+                        }
+                        continue;
+                    }
+
+                    current += c;
+                    tokenStarted = true;
+                }
+
+                if (tokenStarted) {
+                    args.push(current);
+                }
+
+                return args;
+            }
+
+            /**
              * Converts the cURL command string to a yt-dlp command.
              */
             function convertCurlToYtDlp() {
-                // Clean up the input: remove line breaks and extra spaces
-                const curlCmd = curlInput.value
-                    .trim()
-                    .replace(/\\\s*\n/g, " ")
-                    .replace(/\s+/g, " ");
+                const rawInput = curlInput.value.trim();
 
-                if (!curlCmd) {
-                    ytdlpOutput.innerHTML = "Please paste a cURL command.";
+                if (!rawInput) {
+                    ytdlpOutput.textContent = "Please paste a cURL command.";
                     copyButton.disabled = true;
                     return;
                 }
 
-                // 1. Extract URL
-                let url = null;
-                // Matches 'URL' after 'curl '
-                const urlMatchSingle = curlCmd.match(/^curl\s+'([^']+)'/);
-                // Matches "URL" after 'curl '
-                const urlMatchDouble = curlCmd.match(/^curl\s+"([^"]+)"/);
+                const args = tokenizeCurl(rawInput);
+                if (args.length === 0) {
+                    ytdlpOutput.textContent = "Please paste a cURL command.";
+                    copyButton.disabled = true;
+                    return;
+                }
 
-                if (urlMatchSingle) {
-                    url = urlMatchSingle[1];
-                } else if (urlMatchDouble) {
-                    url = urlMatchDouble[1];
+                let startIndex = 0;
+                if (/^curl(\.exe)?$/i.test(args[0])) {
+                    startIndex = 1;
+                }
+
+                let url = null;
+                const headers = [];
+                let cookieString = "";
+                let userAgent = "";
+                const positional = [];
+
+                const knownOptionsWithArg = new Set([
+                    "-h", "--header",
+                    "-b", "--cookie",
+                    "-c", "--cookie-jar",
+                    "-a", "--user-agent",
+                    "-e", "--referer",
+                    "-x", "--request",
+                    "-d", "--data", "--data-raw", "--data-ascii", "--data-binary", "--data-urlencode",
+                    "-f", "--form", "--form-string",
+                    "-u", "--user",
+                    "-o", "--output",
+                    "-m", "--max-time",
+                    "--url",
+                    "--proxy",
+                    "--retry",
+                    "--connect-timeout",
+                    "--cacert", "--cert", "--key"
+                ]);
+
+                function processHeader(headerVal) {
+                    const colonIdx = headerVal.indexOf(":");
+                    if (colonIdx === -1) {
+                        headers.push(`--add-header '${escapeSingleQuote(headerVal)}'`);
+                        return;
+                    }
+                    const name = headerVal.substring(0, colonIdx).trim().toLowerCase();
+                    const value = headerVal.substring(colonIdx + 1).trim();
+
+                    if (name === "cookie") {
+                        cookieString = value;
+                    } else if (name === "user-agent") {
+                        userAgent = value;
+                    } else if (name === "range" || name === "if-range") {
+                        // Skip Range and If-Range headers: browser DevTools requests often
+                        // request partial chunk ranges (e.g. bytes=32768-...) while streaming.
+                        // Forwarding these to yt-dlp causes it to download only that chunk,
+                        // missing the initial container metadata (ftyp/moov atoms) and producing
+                        // a corrupted/unplayable video file.
+                        return;
+                    } else {
+                        headers.push(`--add-header '${escapeSingleQuote(headerVal)}'`);
+                    }
+                }
+
+                for (let i = startIndex; i < args.length; i++) {
+                    const arg = args[i];
+
+                    // --url
+                    if (arg === "--url") {
+                        if (i + 1 < args.length) url = args[++i];
+                        continue;
+                    }
+                    if (arg.startsWith("--url=")) {
+                        url = arg.substring(6);
+                        continue;
+                    }
+
+                    // -H, --header
+                    if (arg === "-H" || arg === "--header") {
+                        if (i + 1 < args.length) processHeader(args[++i]);
+                        continue;
+                    }
+                    if (arg.startsWith("-H") && arg.length > 2) {
+                        processHeader(arg.substring(2));
+                        continue;
+                    }
+                    if (arg.startsWith("--header=")) {
+                        processHeader(arg.substring(9));
+                        continue;
+                    }
+
+                    // -b, --cookie
+                    if (arg === "-b" || arg === "--cookie") {
+                        if (i + 1 < args.length) cookieString = args[++i];
+                        continue;
+                    }
+                    if (arg.startsWith("-b") && arg.length > 2) {
+                        cookieString = arg.substring(2);
+                        continue;
+                    }
+                    if (arg.startsWith("--cookie=")) {
+                        cookieString = arg.substring(9);
+                        continue;
+                    }
+
+                    // -A, --user-agent
+                    if (arg === "-A" || arg === "--user-agent") {
+                        if (i + 1 < args.length) userAgent = args[++i];
+                        continue;
+                    }
+                    if (arg.startsWith("-A") && arg.length > 2) {
+                        userAgent = arg.substring(2);
+                        continue;
+                    }
+                    if (arg.startsWith("--user-agent=")) {
+                        userAgent = arg.substring(13);
+                        continue;
+                    }
+
+                    // -e, --referer
+                    if (arg === "-e" || arg === "--referer") {
+                        if (i + 1 < args.length) processHeader("Referer: " + args[++i]);
+                        continue;
+                    }
+                    if (arg.startsWith("-e") && arg.length > 2) {
+                        processHeader("Referer: " + arg.substring(2));
+                        continue;
+                    }
+                    if (arg.startsWith("--referer=")) {
+                        processHeader("Referer: " + arg.substring(10));
+                        continue;
+                    }
+
+                    // Other known options with an argument
+                    const lower = arg.toLowerCase();
+                    if (knownOptionsWithArg.has(lower)) {
+                        i++;
+                        continue;
+                    }
+
+                    // Flags starting with -
+                    if (arg.startsWith("-")) {
+                        continue;
+                    }
+
+                    // Positional argument
+                    positional.push(arg);
+                }
+
+                // If no explicit --url was provided, find the first positional argument that looks like a URL
+                if (!url) {
+                    url = positional.find((p) => /^https?:\/\//i.test(p)) || positional[0] || null;
                 }
 
                 if (!url) {
@@ -203,75 +417,32 @@
                     return;
                 }
 
-                let headers = [];
-                let cookieString = "";
-                let userAgentHeader = "";
+                // Construct the final yt-dlp command
+                const cmdParts = ["yt-dlp"];
 
-                // 2. Extract Headers (-H)
-                const headerRegex = /-H\s+'([^']+)'/g;
-                let match;
-
-                while ((match = headerRegex.exec(curlCmd)) !== null) {
-                    const header = match[1];
-                    const parts = header.split(":").map((p) => p.trim());
-                    const headerName = parts[0].toLowerCase();
-
-                    if (headerName === "cookie") {
-                        // 3a. Capture cookie string from -H 'cookie:...'
-                        cookieString = header
-                            .substring(header.indexOf(":") + 1)
-                            .trim();
-                    } else if (headerName === "user-agent") {
-                        // 3b. Capture User-Agent separately. Will be added unconditionally later.
-                        userAgentHeader = header;
-                    } else {
-                        // 3c. Add all other headers (including accept, accept-language, and all security headers) unconditionally.
-                        headers.push(`--add-header '${header}'`);
-                    }
+                if (headers.length > 0) {
+                    cmdParts.push(headers.join(" "));
                 }
 
-                // 3d. Extract Cookies (-b) - overrides -H 'cookie' capture
-                const cookieMatch = curlCmd.match(/-b\s+'([^']+)'/);
-                if (cookieMatch) {
-                    cookieString = cookieMatch[1];
+                if (userAgent) {
+                    cmdParts.push(`--user-agent "${userAgent.replace(/"/g, '\\"')}"`);
                 }
 
-                // 4. Construct the final yt-dlp command
-                let ytdlpCommand = `yt-dlp ${headers.join(" ")}`;
-
-                // Add User-Agent unconditionally using the --user-agent flag and double quotes
-                if (userAgentHeader) {
-                    // Extract only the User-Agent value (e.g., stripping 'user-agent: ')
-                    const uaValue = userAgentHeader
-                        .replace(/^user-agent:\s*/i, "")
-                        .trim();
-                    ytdlpCommand += ` --user-agent "${uaValue}"`;
-                }
-
-                // Add Cookies if checked
                 if (cookieString && includeCookies.checked) {
-                    ytdlpCommand += ` --add-header 'cookie: ${cookieString}'`;
+                    cmdParts.push(`--add-header 'cookie: ${escapeSingleQuote(cookieString)}'`);
                 }
 
-                // --- Custom Output Filename Logic ---
+                // Custom Output Filename Logic
                 const customFilename = customFilenameInput.value.trim();
-                let outputFlag;
+                const outputTemplate = customFilename
+                    ? `${customFilename}.%(ext)s`
+                    : "%(title)s.%(ext)s";
+                cmdParts.push(`-o '${escapeSingleQuote(outputTemplate)}'`);
 
-                if (customFilename) {
-                    // If a custom filename is provided (e.g., 'MyVideo'), append the automatic extension.
-                    outputFlag = ` -o '${customFilename}.%(ext)s'`;
-                } else {
-                    // Use yt-dlp's default intelligent naming (title + extension)
-                    outputFlag = ` -o '%(title)s.%(ext)s'`;
-                }
+                // Final target URL
+                cmdParts.push(`'${escapeSingleQuote(url)}'`);
 
-                // Final URL and output naming
-                ytdlpCommand += outputFlag;
-                ytdlpCommand += ` '${url}'`;
-                // --- End Custom Output Filename Logic ---
-
-                // 5. Update UI for the main command
-                ytdlpOutput.textContent = ytdlpCommand.trim();
+                ytdlpOutput.textContent = cmdParts.join(" ");
                 copyButton.disabled = false;
             }
 
@@ -298,11 +469,12 @@
                 }
             }
 
-            // Run conversion on paste for better UX
+            // Run conversion on paste or live typing/editing
             curlInput.addEventListener("paste", () => {
                 // Use a short timeout to ensure the paste event is fully processed
                 setTimeout(convertCurlToYtDlp, 10);
             });
+            curlInput.addEventListener("input", convertCurlToYtDlp);
 
             // Add listeners to re-convert command whenever options change
             includeCookies.addEventListener("change", convertCurlToYtDlp);
