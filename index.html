@@ -5,7 +5,6 @@
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <title>cURL to yt-dlp Converter</title>
         <link rel="icon" type="image/x-icon" href="images/icon.png" />
-        <!-- Tailwind CSS CDN -->
         <script src="https://cdn.tailwindcss.com"></script>
         <link
             href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap"
@@ -17,7 +16,7 @@
                 background-color: #f7f9fb;
             }
             .code-box {
-                background-color: #1f2937; /* Dark background for code */
+                background-color: #1f2937;
                 color: #f3f4f6;
                 padding: 1rem;
                 border-radius: 0.5rem;
@@ -47,14 +46,26 @@
                 </p>
             </header>
 
-            <!-- Input Section -->
             <div class="bg-white p-6 rounded-xl shadow-2xl mb-8">
-                <label
-                    for="curl-input"
-                    class="block text-lg font-semibold text-gray-700 mb-3 flex items-center"
-                >
-                    Paste cURL Command Here
-                </label>
+                <div class="flex justify-between items-center mb-3">
+                    <label
+                        for="curl-input"
+                        class="text-lg font-semibold text-gray-700"
+                    >
+                        Paste cURL Command Here
+                    </label>
+                    <button
+                        type="button"
+                        onclick="clearAll()"
+                        class="text-xs text-gray-400 hover:text-red-600 transition flex items-center gap-1.5 font-medium px-2 py-1 rounded hover:bg-red-50"
+                        title="Clear all inputs and reset (Esc)"
+                    >
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                        Clear All
+                    </button>
+                </div>
                 <textarea
                     id="curl-input"
                     rows="10"
@@ -62,8 +73,52 @@
                     class="code-input w-full p-4 rounded-lg focus:ring-blue-500 focus:border-blue-500 transition duration-150 ease-in-out resize-none text-sm"
                 ></textarea>
 
-                <!-- OPTIONS -->
-                <div class="mt-4 space-y-2">
+                <div class="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div class="flex items-center">
+                        <input
+                            id="fast-download"
+                            type="checkbox"
+                            checked
+                            class="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                        />
+                        <label
+                            for="fast-download"
+                            class="ml-2 block text-sm font-medium text-gray-700"
+                        >
+                            Fast download (<code class="text-xs bg-gray-100 text-gray-800 px-1 py-0.5 rounded font-mono">-N 8</code>)
+                        </label>
+                    </div>
+
+                    <div class="flex items-center">
+                        <input
+                            id="clean-headers"
+                            type="checkbox"
+                            checked
+                            class="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                        />
+                        <label
+                            for="clean-headers"
+                            class="ml-2 block text-sm font-medium text-gray-700"
+                        >
+                            Strip bloat headers (<code class="text-xs bg-gray-100 text-gray-800 px-1 py-0.5 rounded font-mono">sec-*</code>, <code class="text-xs bg-gray-100 text-gray-800 px-1 py-0.5 rounded font-mono">priority</code>)
+                        </label>
+                    </div>
+
+                    <div class="flex items-center">
+                        <input
+                            id="remux-mp4"
+                            type="checkbox"
+                            checked
+                            class="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                        />
+                        <label
+                            for="remux-mp4"
+                            class="ml-2 block text-sm font-medium text-gray-700"
+                        >
+                            Remux to MP4 (<code class="text-xs bg-gray-100 text-gray-800 px-1 py-0.5 rounded font-mono">--remux-video mp4</code>)
+                        </label>
+                    </div>
+
                     <div class="flex items-center">
                         <input
                             id="include-cookies"
@@ -74,40 +129,95 @@
                             for="include-cookies"
                             class="ml-2 block text-sm font-medium text-gray-700"
                         >
-                            Include Cookies (--add-header 'cookie:...')
+                            Include Cookies (<code class="text-xs bg-gray-100 text-gray-800 px-1 py-0.5 rounded font-mono">cookie:...</code>)
                         </label>
                     </div>
                 </div>
-                <!-- END OPTIONS -->
 
-                <!-- CUSTOM FILENAME INPUT -->
-                <div class="mt-4">
-                    <label
-                        for="custom-filename-input"
-                        class="block text-sm font-medium text-gray-700 mb-1"
-                    >
-                        Custom Output Filename (Optional)
-                    </label>
+                <div class="mt-5 pt-4 border-t border-gray-200">
+                    <div class="flex justify-between items-center mb-1">
+                        <label
+                            for="custom-filename-input"
+                            class="block text-sm font-semibold text-gray-700"
+                        >
+                            Output Video Title / Filename (Recommended)
+                        </label>
+                        <span class="text-xs text-gray-400 font-mono">Auto-appends %(ext)s</span>
+                    </div>
                     <input
                         id="custom-filename-input"
                         type="text"
-                        placeholder="e.g., MyVideo (Extension %(ext)s is added automatically)"
-                        class="code-input w-full p-2 rounded-lg focus:ring-blue-500 focus:border-blue-500 transition duration-150 ease-in-out text-sm"
+                        placeholder="e.g., MyVideo (Prevents saving as master.mp4 or index.mp4)"
+                        class="code-input w-full p-2.5 rounded-lg focus:ring-blue-500 focus:border-blue-500 transition duration-150 ease-in-out text-sm"
                     />
-                </div>
-                <!-- END CUSTOM FILENAME INPUT -->
 
-                <button
-                    id="convert-button"
-                    onclick="convertCurlToYtDlp()"
-                    class="mt-4 w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg shadow-md transition duration-200 ease-in-out transform hover:scale-[1.01] focus:outline-none focus:ring-4 focus:ring-blue-500 focus:ring-opacity-50"
-                >
-                    Convert to yt-dlp Command
-                </button>
+                    <div
+                        id="generic-title-warning"
+                        class="hidden mt-2 p-2.5 rounded-lg bg-amber-500/15 border border-amber-500/30 text-amber-900 text-xs flex items-center gap-2"
+                    >
+                        <svg class="w-4 h-4 text-amber-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <span>Generic stream name detected (<span id="generic-stream-filename" class="font-mono font-medium">master.m3u8</span>). yt-dlp will save as <span id="generic-fallback-name" class="font-mono font-medium">master.mp4</span> unless you provide a title.</span>
+                    </div>
+
+                    <div id="title-suggestion-container" class="hidden mt-2.5 flex items-center flex-wrap gap-2 text-xs">
+                        <span class="text-gray-500 font-medium">Suggested Title:</span>
+                        <button
+                            type="button"
+                            id="apply-suggestion-btn"
+                            onclick="applySuggestedTitle()"
+                            class="px-2.5 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-md font-mono font-semibold transition flex items-center gap-1.5 shadow-sm"
+                            title="Click to apply to custom filename"
+                        >
+                            <span id="suggested-title-text"></span>
+                            <span class="text-blue-500 text-[10px] font-sans font-normal">(Click to use)</span>
+                        </button>
+                    </div>
+
+                    <div class="mt-2.5 flex items-center flex-wrap gap-2 text-xs text-gray-500">
+                        <span class="font-medium">Quick Tags:</span>
+                        <button
+                            type="button"
+                            onclick="appendTitleTag(getTodayDate())"
+                            class="px-2 py-0.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded border border-gray-300 transition"
+                        >
+                            + Today's Date
+                        </button>
+                        <button
+                            type="button"
+                            onclick="appendTitleTag('[%(resolution)s]')"
+                            class="px-2 py-0.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded border border-gray-300 transition font-mono"
+                        >
+                            + [%(resolution)s]
+                        </button>
+                        <button
+                            type="button"
+                            onclick="clearCustomTitle()"
+                            class="px-2 py-0.5 text-gray-400 hover:text-red-600 transition ml-auto"
+                        >
+                            Clear
+                        </button>
+                    </div>
+                </div>
             </div>
 
-            <!-- yt-dlp Command Output Section -->
             <div class="bg-gray-800 p-6 rounded-xl shadow-2xl">
+                <div
+                    id="segment-warning"
+                    class="hidden mb-4 p-4 rounded-lg bg-amber-500/15 border border-amber-500/40 text-amber-200 text-sm flex items-start gap-3"
+                >
+                    <svg class="w-5 h-5 text-amber-400 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                    <div>
+                        <p class="font-semibold text-amber-300">Possible single segment chunk detected</p>
+                        <p class="text-xs text-amber-200/90 mt-1 leading-relaxed">
+                            The URL appears to point to an individual media fragment (<code class="bg-amber-900/50 px-1 py-0.5 rounded font-mono">.ts</code> or <code class="bg-amber-900/50 px-1 py-0.5 rounded font-mono">.m4s</code>). Downloading this will only yield a few seconds of video. For the complete video, look for a master playlist (<code class="bg-amber-900/50 px-1 py-0.5 rounded font-mono">.m3u8</code> or <code class="bg-amber-900/50 px-1 py-0.5 rounded font-mono">.mpd</code>) in DevTools Network tab.
+                        </p>
+                    </div>
+                </div>
+
                 <div class="flex justify-between items-center mb-3">
                     <label class="text-lg font-semibold text-gray-100">
                         Generated yt-dlp Command
@@ -129,7 +239,6 @@
                 </div>
             </div>
 
-            <!-- Message Box for Feedback -->
             <div
                 id="message-box"
                 class="fixed bottom-4 right-4 bg-green-500 text-white p-3 rounded-lg shadow-lg hidden transition-opacity duration-300"
@@ -147,14 +256,175 @@
                 "custom-filename-input",
             );
 
-            // Checkboxes
             const includeCookies = document.getElementById("include-cookies");
+            const fastDownload = document.getElementById("fast-download");
+            const cleanHeaders = document.getElementById("clean-headers");
+            const remuxMp4 = document.getElementById("remux-mp4");
+            const segmentWarning = document.getElementById("segment-warning");
 
-            /**
-             * Shows a temporary feedback message.
-             * @param {string} msg The message to display.
-             * @param {string} type The type of message (success or error).
-             */
+            const genericTitleWarning = document.getElementById("generic-title-warning");
+            const genericStreamFilename = document.getElementById("generic-stream-filename");
+            const genericFallbackName = document.getElementById("generic-fallback-name");
+            const titleSuggestionContainer = document.getElementById("title-suggestion-container");
+            const suggestedTitleText = document.getElementById("suggested-title-text");
+
+            function sanitizeTitleString(str) {
+                return decodeURIComponent(str)
+                    .replace(/[-_+]+/g, " ")
+                    .replace(/\s+/g, " ")
+                    .trim()
+                    .replace(/\b\w/g, (c) => c.toUpperCase());
+            }
+
+            function extractCandidateTitle(referer, streamUrl) {
+                const urls = [referer, streamUrl].filter(Boolean);
+                for (const u of urls) {
+                    try {
+                        let parsed;
+                        try {
+                            parsed = new URL(u);
+                        } catch (_) {
+                            continue;
+                        }
+
+                        const codeMatch = parsed.pathname.match(/\b([a-zA-Z]{2,8}[-_]\d{2,6})\b/);
+                        if (codeMatch) {
+                            return codeMatch[1].toUpperCase();
+                        }
+
+                        for (const key of ["title", "name", "video_title", "slug", "id"]) {
+                            const val = parsed.searchParams.get(key);
+                            if (val && val.length > 2 && !/^\d+$/.test(val)) {
+                                const codeInQuery = val.match(/\b([a-zA-Z]{2,8}[-_]\d{2,6})\b/);
+                                if (codeInQuery) return codeInQuery[1].toUpperCase();
+                                return sanitizeTitleString(val);
+                            }
+                        }
+
+                        const segments = parsed.pathname
+                            .split("/")
+                            .map((s) => s.trim())
+                            .filter(Boolean);
+
+                        const ignoreWords = new Set([
+                            "watch", "video", "videos", "view", "play", "player", "embed",
+                            "v", "e", "movie", "movies", "hls", "dash", "vod", "stream",
+                            "manifest", "playlist", "master", "index", "chunklist", "media",
+                            "content", "file", "sec", "segment"
+                        ]);
+
+                        for (let i = segments.length - 1; i >= 0; i--) {
+                            let seg = decodeURIComponent(segments[i]);
+                            seg = seg.replace(/\.(html?|php|aspx?|jsp|m3u8|mpd|mp4|ts|m4s)$/i, "");
+                            const lower = seg.toLowerCase();
+                            if (!ignoreWords.has(lower) && seg.length > 2 && !/^\d+$/.test(seg)) {
+                                return sanitizeTitleString(seg);
+                            }
+                        }
+                    } catch (_) {}
+                }
+                return "";
+            }
+
+            function isGenericStreamName(urlString) {
+                if (!urlString) return null;
+                try {
+                    let path = "";
+                    try {
+                        path = new URL(urlString).pathname.toLowerCase();
+                    } catch (_) {
+                        path = urlString.split("?")[0].toLowerCase();
+                    }
+                    const filename = path.split("/").pop() || "";
+                    const match = filename.match(/^(master|index|playlist|manifest|stream|video|chunklist|prog_index)\b/i);
+                    return match ? filename : null;
+                } catch (_) {
+                    return null;
+                }
+            }
+
+            function sanitizeFilename(name) {
+                if (!name) return "";
+                let cleaned = name.replace(/\.(mp4|mkv|webm|ts|mov|m4v|avi)$/i, "");
+                cleaned = cleaned.replace(/[/\\:*?"<>|]/g, "");
+                return cleaned.trim();
+            }
+
+            function getTodayDate() {
+                const now = new Date();
+                const y = now.getFullYear();
+                const m = String(now.getMonth() + 1).padStart(2, "0");
+                const d = String(now.getDate()).padStart(2, "0");
+                return `${y}-${m}-${d}`;
+            }
+
+            function appendTitleTag(tag) {
+                const current = customFilenameInput.value.trim();
+                if (!current) {
+                    customFilenameInput.value = tag;
+                } else if (tag.startsWith("[")) {
+                    customFilenameInput.value = `${current} ${tag}`;
+                } else {
+                    customFilenameInput.value = `${tag} - ${current}`;
+                }
+                convertCurlToYtDlp();
+                customFilenameInput.focus();
+            }
+
+            function clearCustomTitle() {
+                customFilenameInput.value = "";
+                convertCurlToYtDlp();
+                customFilenameInput.focus();
+            }
+
+            function clearAll() {
+                curlInput.value = "";
+                customFilenameInput.value = "";
+                ytdlpOutput.textContent = "The generated command will appear here after conversion.";
+                copyButton.disabled = true;
+                segmentWarning.classList.add("hidden");
+                genericTitleWarning.classList.add("hidden");
+                titleSuggestionContainer.classList.add("hidden");
+                curlInput.focus();
+            }
+
+            function applySuggestedTitle() {
+                const suggested = suggestedTitleText.textContent;
+                if (suggested) {
+                    customFilenameInput.value = suggested;
+                    convertCurlToYtDlp();
+                    showMessage(`Applied title: ${suggested}`);
+                }
+            }
+
+            function isSegmentChunkUrl(urlString) {
+                if (!urlString) return false;
+                try {
+                    let path = "";
+                    try {
+                        path = new URL(urlString).pathname.toLowerCase();
+                    } catch (_) {
+                        path = urlString.split("?")[0].split("#")[0].toLowerCase();
+                    }
+
+                    if (/\.(m3u8|mpd|ism|f4m)$/i.test(path)) {
+                        return false;
+                    }
+
+                    if (/\.(ts|m4s|m4f|cmfv|cmfa)$/i.test(path)) {
+                        return true;
+                    }
+
+                    if (/(?:segment|seg|chunk|fragment|frag)[-_]?\d+/i.test(path)) {
+                        return true;
+                    }
+
+                    return false;
+                } catch (_) {
+                    return false;
+                }
+            }
+
             function showMessage(msg, type = "success") {
                 messageBox.textContent = msg;
                 messageBox.className = `fixed bottom-4 right-4 p-3 rounded-lg shadow-lg transition-opacity duration-300 ${
@@ -167,24 +437,11 @@
                 }, 3000);
             }
 
-            /**
-             * Escapes single quotes for POSIX shell command compatibility.
-             * @param {string} str The string to escape.
-             * @returns {string} The escaped string.
-             */
             function escapeSingleQuote(str) {
                 return str.replace(/'/g, "'\\''");
             }
 
-            /**
-             * Tokenizes a shell command string into discrete arguments, handling
-             * single quotes, double quotes, escape sequences, and line continuations.
-             * @param {string} input The raw command string.
-             * @returns {string[]} Array of argument tokens.
-             */
             function tokenizeCurl(input) {
-                // Pre-clean: strip line continuations (\ or ^ followed by newline)
-                // and normalize Windows CMD caret-escaped quotes (^")
                 const clean = input
                     .trim()
                     .replace(/\\\s*\r?\n/g, " ")
@@ -246,15 +503,15 @@
                 return args;
             }
 
-            /**
-             * Converts the cURL command string to a yt-dlp command.
-             */
             function convertCurlToYtDlp() {
                 const rawInput = curlInput.value.trim();
 
                 if (!rawInput) {
                     ytdlpOutput.textContent = "Please paste a cURL command.";
                     copyButton.disabled = true;
+                    segmentWarning.classList.add("hidden");
+                    genericTitleWarning.classList.add("hidden");
+                    titleSuggestionContainer.classList.add("hidden");
                     return;
                 }
 
@@ -262,6 +519,9 @@
                 if (args.length === 0) {
                     ytdlpOutput.textContent = "Please paste a cURL command.";
                     copyButton.disabled = true;
+                    segmentWarning.classList.add("hidden");
+                    genericTitleWarning.classList.add("hidden");
+                    titleSuggestionContainer.classList.add("hidden");
                     return;
                 }
 
@@ -274,6 +534,7 @@
                 const headers = [];
                 let cookieString = "";
                 let userAgent = "";
+                let refererUrl = "";
                 const positional = [];
 
                 const knownOptionsWithArg = new Set([
@@ -308,12 +569,25 @@
                         cookieString = value;
                     } else if (name === "user-agent") {
                         userAgent = value;
+                    } else if (name === "referer") {
+                        refererUrl = value;
+                        headers.push(`--add-header '${escapeSingleQuote(headerVal)}'`);
                     } else if (name === "range" || name === "if-range") {
-                        // Skip Range and If-Range headers: browser DevTools requests often
-                        // request partial chunk ranges (e.g. bytes=32768-...) while streaming.
-                        // Forwarding these to yt-dlp causes it to download only that chunk,
-                        // missing the initial container metadata (ftyp/moov atoms) and producing
-                        // a corrupted/unplayable video file.
+                        // Skip partial range headers from browser streams to avoid corrupt files
+                        return;
+                    } else if (
+                        cleanHeaders.checked &&
+                        (name.startsWith("sec-ch-") ||
+                            name.startsWith("sec-fetch-") ||
+                            name.startsWith(":") ||
+                            name === "priority" ||
+                            name === "accept-encoding" ||
+                            name === "content-length" ||
+                            name === "connection" ||
+                            name === "host" ||
+                            name === "upgrade-insecure-requests" ||
+                            name === "dnt")
+                    ) {
                         return;
                     } else {
                         headers.push(`--add-header '${escapeSingleQuote(headerVal)}'`);
@@ -323,7 +597,6 @@
                 for (let i = startIndex; i < args.length; i++) {
                     const arg = args[i];
 
-                    // --url
                     if (arg === "--url") {
                         if (i + 1 < args.length) url = args[++i];
                         continue;
@@ -333,7 +606,6 @@
                         continue;
                     }
 
-                    // -H, --header
                     if (arg === "-H" || arg === "--header") {
                         if (i + 1 < args.length) processHeader(args[++i]);
                         continue;
@@ -347,7 +619,6 @@
                         continue;
                     }
 
-                    // -b, --cookie
                     if (arg === "-b" || arg === "--cookie") {
                         if (i + 1 < args.length) cookieString = args[++i];
                         continue;
@@ -361,7 +632,6 @@
                         continue;
                     }
 
-                    // -A, --user-agent
                     if (arg === "-A" || arg === "--user-agent") {
                         if (i + 1 < args.length) userAgent = args[++i];
                         continue;
@@ -375,7 +645,6 @@
                         continue;
                     }
 
-                    // -e, --referer
                     if (arg === "-e" || arg === "--referer") {
                         if (i + 1 < args.length) processHeader("Referer: " + args[++i]);
                         continue;
@@ -389,23 +658,19 @@
                         continue;
                     }
 
-                    // Other known options with an argument
                     const lower = arg.toLowerCase();
                     if (knownOptionsWithArg.has(lower)) {
                         i++;
                         continue;
                     }
 
-                    // Flags starting with -
                     if (arg.startsWith("-")) {
                         continue;
                     }
 
-                    // Positional argument
                     positional.push(arg);
                 }
 
-                // If no explicit --url was provided, find the first positional argument that looks like a URL
                 if (!url) {
                     url = positional.find((p) => /^https?:\/\//i.test(p)) || positional[0] || null;
                 }
@@ -414,11 +679,46 @@
                     ytdlpOutput.innerHTML =
                         "<span class='text-red-400'>Error: Could not find a valid URL in the command.</span>";
                     copyButton.disabled = true;
+                    segmentWarning.classList.add("hidden");
+                    genericTitleWarning.classList.add("hidden");
+                    titleSuggestionContainer.classList.add("hidden");
                     return;
                 }
 
-                // Construct the final yt-dlp command
+                if (isSegmentChunkUrl(url)) {
+                    segmentWarning.classList.remove("hidden");
+                } else {
+                    segmentWarning.classList.add("hidden");
+                }
+
+                const candidateTitle = extractCandidateTitle(refererUrl, url);
+                const currentCustom = customFilenameInput.value.trim();
+                if (candidateTitle && candidateTitle !== currentCustom) {
+                    suggestedTitleText.textContent = candidateTitle;
+                    titleSuggestionContainer.classList.remove("hidden");
+                } else {
+                    titleSuggestionContainer.classList.add("hidden");
+                }
+
+                const genericName = isGenericStreamName(url);
+                if (genericName && !currentCustom) {
+                    genericStreamFilename.textContent = genericName;
+                    const baseName = genericName.split(".")[0];
+                    genericFallbackName.textContent = remuxMp4.checked ? `${baseName}.mp4` : `${baseName}.%(ext)s`;
+                    genericTitleWarning.classList.remove("hidden");
+                } else {
+                    genericTitleWarning.classList.add("hidden");
+                }
+
                 const cmdParts = ["yt-dlp"];
+
+                if (fastDownload.checked) {
+                    cmdParts.push("-N 8");
+                }
+
+                if (remuxMp4.checked) {
+                    cmdParts.push("--remux-video mp4");
+                }
 
                 if (headers.length > 0) {
                     cmdParts.push(headers.join(" "));
@@ -432,29 +732,23 @@
                     cmdParts.push(`--add-header 'cookie: ${escapeSingleQuote(cookieString)}'`);
                 }
 
-                // Custom Output Filename Logic
-                const customFilename = customFilenameInput.value.trim();
-                const outputTemplate = customFilename
-                    ? `${customFilename}.%(ext)s`
+                const sanitizedCustom = sanitizeFilename(currentCustom);
+                const outputTemplate = sanitizedCustom
+                    ? `${sanitizedCustom}.%(ext)s`
                     : "%(title)s.%(ext)s";
                 cmdParts.push(`-o '${escapeSingleQuote(outputTemplate)}'`);
 
-                // Final target URL
                 cmdParts.push(`'${escapeSingleQuote(url)}'`);
 
                 ytdlpOutput.textContent = cmdParts.join(" ");
                 copyButton.disabled = false;
             }
 
-            /**
-             * Copies the content of a given element ID to the clipboard.
-             * @param {string} elementId The ID of the element whose text to copy.
-             */
             function copyToClipboard(elementId) {
                 const textToCopy =
                     document.getElementById(elementId).textContent;
 
-                // Use the older document.execCommand('copy') for better compatibility in iframe environments
+                // Fallback for iframe and local file context compatibility
                 try {
                     const tempTextArea = document.createElement("textarea");
                     tempTextArea.value = textToCopy;
@@ -469,16 +763,34 @@
                 }
             }
 
-            // Run conversion on paste or live typing/editing
             curlInput.addEventListener("paste", () => {
-                // Use a short timeout to ensure the paste event is fully processed
-                setTimeout(convertCurlToYtDlp, 10);
+                setTimeout(() => {
+                    convertCurlToYtDlp();
+                    if (!genericTitleWarning.classList.contains("hidden") && !customFilenameInput.value.trim()) {
+                        customFilenameInput.focus();
+                    }
+                }, 20);
             });
             curlInput.addEventListener("input", convertCurlToYtDlp);
 
-            // Add listeners to re-convert command whenever options change
             includeCookies.addEventListener("change", convertCurlToYtDlp);
+            fastDownload.addEventListener("change", convertCurlToYtDlp);
+            cleanHeaders.addEventListener("change", convertCurlToYtDlp);
+            remuxMp4.addEventListener("change", convertCurlToYtDlp);
             customFilenameInput.addEventListener("input", convertCurlToYtDlp);
+            customFilenameInput.addEventListener("blur", () => {
+                const cleaned = sanitizeFilename(customFilenameInput.value);
+                if (cleaned !== customFilenameInput.value) {
+                    customFilenameInput.value = cleaned;
+                    convertCurlToYtDlp();
+                }
+            });
+
+            document.addEventListener("keydown", (e) => {
+                if (e.key === "Escape") {
+                    clearAll();
+                }
+            });
         </script>
     </body>
 </html>

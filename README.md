@@ -23,10 +23,16 @@ To bypass this, you typically copy the network request from your browser's Devel
 ## ✨ Features
 
 - **Instant Parsing**: Automatically converts your command as soon as you paste it.
-- **Header Translation**: Maps HTTP headers (`-H`) cleanly into `yt-dlp`'s `--add-header` flags.
+- **Smart Title Extraction**: Scans the `Referer` URL and media path for video titles or media codes and provides a 1-click chip to populate the output filename.
+- **Generic Stream Detection & Auto-Focus**: Detects generic playlist names (`master.m3u8`, `index.m3u8`, `manifest.mpd`) and auto-focuses the title input so you can name your video immediately.
+- **Filename Sanitizer & Quick Tags**: Automatically strips filesystem-illegal characters and duplicate extensions, with quick buttons for `+ Today's Date` and `+ [%(resolution)s]`.
+- **Fast Concurrent Downloads**: Includes a `-N 8` (`--concurrent-fragments 8`) option to download HLS/DASH fragments in parallel, boosting download speeds by up to 5x–10x.
+- **Header Translation & Bloat Sanitization**: Maps essential headers (`-H`) into `--add-header`, while stripping browser clutter (`sec-ch-*`, `sec-fetch-*`, `priority`, `accept-encoding`).
+- **Segment Chunk Warning**: Detects if you accidentally copied an individual stream chunk (`.ts` / `.m4s`) instead of the master manifest (`.m3u8` / `.mpd`).
+- **Remux to MP4**: `--remux-video mp4` toggle (enabled by default) to ensure video and audio streams are packaged cleanly into a standard MP4 file.
 - **User-Agent Extraction**: Identifies `user-agent` and isolates it into `--user-agent "<UA>"`.
 - **Optional Cookies**: Choose whether to include or exclude browser cookies (`-b` / `cookie:`) with a simple checkbox toggle.
-- **Custom Output Templates**: Specify a custom output filename (automatically appends `%(ext)s`) or falls back to yt-dlp's standard `%(title)s.%(ext)s`.
+- **1-Click Reset**: "Clear All" button (or press `Esc`) resets all inputs, output, and warnings, auto-focusing the input box ready for the next video.
 - **1-Click Copy**: Copy the generated terminal command with one click.
 - **100% Client-Side & Private**: Runs entirely in the browser. No requests, headers, or sensitive cookie data are ever transmitted to any external server.
 
